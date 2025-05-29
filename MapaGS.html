@@ -1,215 +1,97 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="es">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Carte OpenStreetMap avec point GPS dynamique et polyligne</title>
+  <meta charset="utf-8">
+  <title>Mapa Ruta 214 con Animación</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Feuille de style Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-        }
-        #map {
-            flex-grow: 1;
-            width: 100%;
-            min-height: 300px;
-        }
-        .school-label {
-            color: black;
-            text-shadow: 0 0 3px white, 0 0 5px white;
-            padding: 2px 6px;
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            font-weight: bold;
-            white-space: nowrap;
-            position: absolute;
-            transform: translate(10px, -25px);
-        }
-        .custom-div-icon {
-            display: flex;
-            align-items: flex-start;
-        }
-        /* Masquer l'attribution Leaflet */
-        .leaflet-control-attribution {
-            display: none !important;
-        }
-        #header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #FE8304;
-            color: black;
-            padding: 20px;
-            margin: 0;
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            z-index: 1000;
-        }
-        #footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background-color: #FE8304;
-            padding: 20px;
-            color: white;
-            font-weight: bold;
-            text-align: right;
-            z-index: 1000;
-        }
-    </style>
-
-    <!-- Script Leaflet -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; width: 100vw; }
+  </style>
 </head>
 <body>
-    <!-- Ajout de l'en-tête ici -->
-    <div id="header">SUPERVISIÓN DEL CIRCUITO ESCOLAR</div>
 
-    <div id="map"></div>
-    <div id="footer">© 2025 UTBFM Juárez N.L.</div>
+<div id="map"></div>
 
-    <script>
-        // Inicializar la carta con una posición por defecto
-        var map = L.map('map').setView([25.638682972120648, -100.04763754830324], 13);
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- PapaParse para leer CSV -->
+<script src="https://unpkg.com/papaparse@5.3.2/papaparse.min.js"></script>
 
-        // Añadir las tuiles OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+<script>
+  // Crear el mapa
+  const map = L.map('map').setView([4.60971, -74.08175], 13);
 
-        // Definir un ícono personalizado para el autobús (flecha azul)
-        var busIcon = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            shadowSize: [41, 41]
-        });
+  // Agregar capa base de OpenStreetMap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
 
-        // Marcador para el autobús (inicialmente nulo)
-        var marker = null;
+  // URL de Google Sheets como CSV
+  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIHluULAgC8UMuAgIkTZ6bdAI7QkyfpjnUNRWq70SUotXqecLnfTWk-50Kc3ujjESUiccmGQI9TZ5p/pub?output=csv";
 
-        // Actualizar o crear el marcador
-        function updateMarker(lat, lon) {
-            const coords = [lat, lon];
-            if (marker) {
-                marker.setLatLng(coords);
-            } else {
-                marker = L.marker(coords, { icon: busIcon }).addTo(map);
-                console.log('Marcador creado en:', coords);
-            }
-            map.panTo(coords);
-            console.log('Marcador actualizado a:', coords);
+  // Lista de coordenadas para ruta
+  let routeCoords = [];
+
+  // Cargar datos desde Google Sheets
+  Papa.parse(csvUrl, {
+    download: true,
+    header: true,
+    complete: function(results) {
+      results.data.forEach(function(row) {
+        const lat = parseFloat(row.LATITUD);
+        const lng = parseFloat(row.LONGITUD);
+        const bus = row["ID BUS"] || "Bus";
+        const parada = row.PARADA || "Parada";
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          // Marcadores
+          L.marker([lat, lng])
+            .addTo(map)
+            .bindPopup(`<strong>${bus}</strong><br>${parada}`);
+
+          routeCoords.push([lat, lng]);
         }
+      });
 
-        // Función para recuperar los datos GPS desde la API de Google Sheets
-        async function fetchGPSData() {
-            try {
-                const spreadsheetId = '14kkhg9O_w3Tf2n6YHaCW6J46bTqi0qi6JnmkaYggP2A';
-                const apiKey = 'AIzaSyDR1wky4eBG-rdB0hcEKs45N5iA30AO7TQ'; // Reemplaza con tu clave API
-                const range = 'Hoja 1!C2:D2'; // Ajusta "Hoja 1" al nombre de tu pestaña
-                const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
+      if (routeCoords.length > 1) {
+        // Línea de ruta
+        L.polyline(routeCoords, { color: 'blue', weight: 4 }).addTo(map);
+        map.fitBounds(routeCoords);
 
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`Error al cargar los datos de la API: ${response.statusText}`);
+        // Iniciar animación del bus
+        animateBus(routeCoords);
+      }
+    }
+  });
 
-                const data = await response.json();
-                console.log('Datos recibidos:', data);
+  // Función para mover un ícono de bus entre paradas
+  function animateBus(coords) {
+    const busIcon = L.icon({
+      iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61205.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
 
-                // Extraer los valores de C2 y D2
-                const values = data.values[0]; // Primera fila del rango C2:D2
-                const lat = parseFloat(values[0]); // Celda C2
-                const lon = parseFloat(values[1]); // Celda D2
+    let i = 0;
+    const marker = L.marker(coords[0], { icon: busIcon }).addTo(map);
 
-                console.log('Coordenadas (C2, D2):', lat, lon);
+    function moveNext() {
+      i++;
+      if (i < coords.length) {
+        marker.setLatLng(coords[i]);
+        setTimeout(moveNext, 2000); // Mueve cada 2 segundos
+      } else {
+        i = 0;
+        setTimeout(moveNext, 2000); // Reinicia ruta
+      }
+    }
 
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    updateMarker(lat, lon);
-                } else {
-                    console.warn('Coordenadas GPS inválidas:', values);
-                }
-            } catch (err) {
-                console.error('Error al recuperar las coordenadas GPS:', err);
-            }
-        }
+    setTimeout(moveNext, 2000);
+  }
+</script>
 
-        // Actualización inicial + cada 10 segundos
-        fetchGPSData();
-        setInterval(fetchGPSData, 10000);
-
-        // Añadir marcadores con etiquetas permanentes para cada establecimiento
-        var customMarker1 = L.marker([25.648591068705205, -100.0856852033863], {
-            icon: L.divIcon({
-                className: 'custom-div-icon',
-                html: '<div><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png" style="width:25px; height:41px;"><div class="school-label">CECYTE</div></div>',
-                iconSize: [50, 41],
-                iconAnchor: [12, 41]
-            })
-        }).addTo(map);
-
-        var customMarker2 = L.marker([25.63792851629281, -100.04780921128857], {
-            icon: L.divIcon({
-                className: 'custom-div-icon',
-                html: '<div><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png" style="width:25px; height:41px;"><div class="school-label">UTBFM</div></div>',
-                iconSize: [50, 41],
-                iconAnchor: [12, 41]
-            })
-        }).addTo(map);
-
-        var customMarker3 = L.marker([25.64946065968687, -100.0733161251606], {
-            icon: L.divIcon({
-                className: 'custom-div-icon',
-                html: '<div><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png" style="width:25px; height:41px;"><div class="school-label">CONALEP</div></div>',
-                iconSize: [50, 41],
-                iconAnchor: [12, 41]
-            })
-        }).addTo(map);
-
-        var customMarker4 = L.marker([25.64517418001307, -100.08823920605757], {
-            icon: L.divIcon({
-                className: 'custom-div-icon',
-                html: '<div><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png" style="width:25px; height:41px;"><div class="school-label">Preparatoria 22 UANL</div></div>',
-                iconSize: [100, 41],
-                iconAnchor: [12, 41]
-            })
-        }).addTo(map);
-
-        var customMarker5 = L.marker([25.604540659906498, -100.10462623465052], {
-            icon: L.divIcon({
-                className: 'custom-div-icon',
-                html: '<div><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png" style="width:25px; height:41px;"><div class="school-label">UNIDAD ACADEMICA JUAREZ UANL</div></div>',
-                iconSize: [150, 41],
-                iconAnchor: [12, 41]
-            })
-        }).addTo(map);
-
-        // Añadir una polilínea con las coordenadas proporcionadas
-        var polylinePoints = [
-            [25.638258, -100.047526], [25.638282, -100.047646], [25.638488, -100.047686], [25.638597, -100.047657], [25.638514, -100.048469], [25.638471, -100.050109], [25.639155, -100.052001], [25.639859, -100.053821], [25.640219, -100.054835], [25.64098, -100.056557], [25.64181, -100.057367], [25.642808, -100.058271], [25.643748, -100.059105], [25.644284, -100.059913], [25.644681, -100.060902], [25.645975, -100.062918], [25.646794, -100.064365], [25.647349, -100.065385], [25.648781, -100.067662], [25.648882, -100.068966], [25.649262, -100.071203], [25.64973, -100.072065], [25.650088, -100.072725], [25.650484, -100.073459], [25.65092, -100.074177], [25.651524, -100.075169], [25.652286, -100.076025], [25.652724, -100.076675], [25.653543, -100.078179], [25.654079, -100.0793], [25.654749, -100.080438], [25.654757, -100.080454], [25.654757, -100.080453], [25.654757, -100.080452], [25.654756, -100.080452], [25.654694, -100.081059], [25.652481, -100.082373], [25.650872, -100.083322], [25.649067, -100.084382], [25.647737, -100.085216], [25.645493, -100.086489], [25.644265, -100.087315], [25.642228, -100.088465], [25.641106, -100.089097], [25.641086, -100.089131], [25.640842, -100.089344], [25.640471, -100.090491], [25.640644, -100.091747], [25.641572, -100.09317], [25.641565, -100.093208], [25.641559, -100.093211], [25.641583, -100.09324], [25.640593, -100.094131], [25.63866, -100.09529], [25.636621, -100.096463], [25.635271, -100.097278], [25.633607, -100.098241], [25.631823, -100.099239], [25.630505, -100.099987], [25.630323, -100.100041], [25.629283, -100.100644], [25.628087, -100.101355], [25.62763, -100.101646], [25.625218, -100.102974], [25.62195, -100.104813], [25.618952, -100.106525], [25.616213, -100.108005], [25.612831, -100.10992], [25.609489, -100.111838], [25.60785, -100.112006], [25.607483, -100.108601], [25.606175, -100.105801], [25.605113, -100.104267], [25.606152, -100.105725], [25.607534, -100.108577], [25.607878, -100.111903], [25.608915, -100.112117], [25.612267, -100.11023], [25.615527, -100.108348], [25.617964, -100.107035], [25.618023, -100.106998], [25.618023, -100.106997], [25.618016, -100.106992], [25.618497, -100.106761], [25.619479, -100.109219], [25.620905, -100.112493], [25.623005, -100.115551], [25.624974, -100.118425], [25.626747, -100.120908], [25.627285, -100.121597], [25.627733, -100.122168], [25.629945, -100.125035], [25.631431, -100.128072], [25.632778, -100.130985], [25.633555, -100.132668], [25.635266, -100.136272], [25.635989, -100.138278], [25.637124, -100.142468], [25.637622, -100.144263], [25.638534, -100.147635], [25.638957, -100.148999], [25.639799, -100.15161], [25.639963, -100.151981], [25.640158, -100.152249], [25.640984, -100.151682], [25.643453, -100.149397], [25.644056, -100.14883], [25.646502, -100.146497], [25.647528, -100.14548], [25.647534, -100.145478], [25.647728, -100.145264], [25.648564, -100.146661], [25.648821, -100.149499], [25.648854, -100.15042], [25.648737, -100.150468], [25.64862, -100.149609], [25.648279, -100.146414], [25.647744, -100.145505], [25.647271, -100.14589], [25.645212, -100.147867], [25.644164, -100.148792], [25.642575, -100.150272], [25.640935, -100.151785], [25.64059, -100.152036], [25.640575, -100.152052], [25.6406, -100.15206], [25.639916, -100.152481], [25.639521, -100.151451], [25.638345, -100.148195], [25.637913, -100.14661], [25.637755, -100.146115], [25.63707, -100.143393], [25.636659, -100.14182], [25.635797, -100.138627], [25.635323, -100.137016], [25.633578, -100.133255], [25.63275, -100.131545], [25.631281, -100.128453], [25.630514, -100.126855], [25.628761, -100.123958], [25.6281, -100.123061], [25.627824, -100.122739], [25.627377, -100.122158], [25.625977, -100.120313], [25.624882, -100.118773], [25.624868, -100.118732], [25.624709, -100.118493], [25.62317, -100.116287], [25.621695, -100.114042], [25.621092, -100.113159], [25.620442, -100.112237], [25.61933, -100.109552], [25.618853, -100.107847], [25.618701, -100.107502], [25.617373, -100.107332], [25.615964, -100.108149], [25.61432, -100.109085], [25.610764, -100.111085], [25.607994, -100.112591], [25.60636, -100.106099], [25.604999, -100.10431]
-        ];
-
-        var polyline = L.polyline(polylinePoints, {
-            color: '#FE8304',
-            weight: 5,
-            opacity: 0.7
-        }).addTo(map);
-
-        // Ajustar la vista para incluir la polilínea
-        map.fitBounds(polyline.getBounds());
-    </script>
 </body>
 </html>
-
-
-
