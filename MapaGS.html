@@ -89,7 +89,7 @@
         var busPath = []; // Almacenar las coordenadas del recorrido
         var busPolyline = L.polyline([], { color: '#FF0000', weight: 5, opacity: 0.7 }).addTo(map); // Polilínea dinámica
 
-        // Mettre à jour ou créer le marqueur
+        // Mettre à jour ou créer le marqueur y la polilínea
         function updateMarker(lat, lon) {
             const coords = [lat, lon];
             if (marker) {
@@ -102,12 +102,13 @@
             // Añadir las coordenadas al recorrido y actualizar la polilínea
             busPath.push(coords);
             busPolyline.setLatLngs(busPath);
+            map.fitBounds(busPolyline.getBounds()); // Ajustar el mapa al recorrido
         }
 
         // Fonction pour récupérer les données GPS depuis un fichier CSV
         async function fetchGPSData() {
             try {
-                const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRIHluULAgC8UMuAgIkTZ6bdAI7QkyfpjnUNRWq70SUotXqecLnfTWk-50Kc3ujjESUiccmGQI9TZ5p/pub?output=csv'; // URL proporcionada
+                const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRIHluULAgC8UMuAgIkTZ6bdAI7QkyfpjnUNRWq70SUotXqecLnfTWk-50Kc3ujjESUiccmGQI9TZ5p/pub?output=csv';
                 const response = await fetch(sheetUrl);
                 if (!response.ok) throw new Error('Erreur de chargement des données CSV');
 
@@ -119,19 +120,22 @@
 
                 // Ignorer la ligne d'en-tête
                 const dataLines = lines.slice(1);
-                const lastLine = dataLines[dataLines.length - 1];
+                const lastLine = dataLines[dataLines.length - 1].trim();
                 const columns = lastLine.split(',');
+
+                // Depuración: Mostrar todas las columnas
+                console.log('Columnas:', columns);
 
                 // Asegúrate de que las columnas de latitud y longitud sean las correctas (C y D en tu hoja)
                 const lat = parseFloat(columns[2]); // Columna C (Latitud)
                 const lon = parseFloat(columns[3]); // Columna D (Longitud)
 
-                console.log('Dernières coordonnées:', lat, lon);
+                console.log('Coordenadas parseadas - Lat:', lat, 'Lon:', lon);
 
                 if (!isNaN(lat) && !isNaN(lon)) {
                     updateMarker(lat, lon);
                 } else {
-                    console.warn('Coordonnées GPS invalides :', lastLine);
+                    console.warn('Coordonnées GPS invalides:', lastLine);
                 }
             } catch (err) {
                 console.error('Erreur lors de la récupération des coordonnées GPS :', err);
@@ -188,7 +192,7 @@
             })
         }).addTo(map);
 
-        // Restaurar la polilínea predefinida
+        // Polilínea predefinida
         var polylinePoints = [
             [25.638258, -100.047526], [25.638282, -100.047646], [25.638488, -100.047686], [25.638597, -100.047657],
             [25.638514, -100.048469], [25.638471, -100.050109], [25.639155, -100.052001], [25.639859, -100.053821],
@@ -261,7 +265,7 @@
             opacity: 0.7
         }).addTo(map);
 
-        // Ajuster la vue pour inclure la polyligne
+        // Ajuster la vue para incluir la polilínea
         map.fitBounds(polyline.getBounds());
     </script>
 </body>
